@@ -35,7 +35,7 @@ CACHE_EXPIRY_HOURS = 24
 def parse_args():
     """Parse CLI arguments to optionally override environment variables."""
     parser = argparse.ArgumentParser(description='Jira proxy server')
-    parser.add_argument('--server_port', type=int, help='Port to run the server on (defaults to 5050 or SERVER_PORT env)')
+    parser.add_argument('--server_port', type=int, help='Port to run the server on (defaults to 5000 or SERVER_PORT env)')
     parser.add_argument('--jira_email', help='Jira account email (overrides JIRA_EMAIL env)')
     parser.add_argument('--jira_token', help='Jira API token (overrides JIRA_TOKEN env)')
     parser.add_argument('--jira_url', help='Base Jira URL, e.g. https://your-domain.atlassian.net (overrides JIRA_URL env)')
