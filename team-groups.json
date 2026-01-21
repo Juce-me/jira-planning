@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "groups": [
+    {
+      "id": "default",
+      "name": "Bidswitch",
+      "teamIds": [
+        "78894f38-30f1-46fd-94de-dd05f0cbc50b",
+        "2feb0f65-1ec5-4461-88b1-0d6875d39f1c",
+        "40fd36e0-d20c-413b-a495-25b6e986b3d3",
+        "7fa41d57-307a-431a-9460-7f02d4f69412",
+        "3b5cebce-c7b0-4c22-a5ac-69242748de6f",
+        "2100282b-b1ef-408f-b668-c27d1a302d11",
+        "41370294-d264-448d-846e-415b6a63b7fd",
+        "25f7cde4-bc47-4a2c-b0bb-ca043288c958"
+      ]
+    }
+  ],
+  "defaultGroupId": "default"
+}
