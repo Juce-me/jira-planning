@@ -2380,21 +2380,31 @@
         }
 
         .scenario-axis {
-            display: flex;
-            justify-content: space-between;
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.65rem;
-            color: var(--text-secondary);
-            margin-bottom: 0.5rem;
-            padding-left: var(--scenario-label-width);
-            min-height: var(--scenario-axis-height);
             position: sticky;
             top: 0;
             background: #fff;
             z-index: 4;
+            min-height: var(--scenario-axis-height);
             padding-top: 0.2rem;
+            padding-left: var(--scenario-label-width);
+            margin-bottom: 0.5rem;
             width: 100%;
             min-width: 0;
+        }
+
+        .scenario-axis-ticks {
+            position: relative;
+            height: 100%;
+            min-height: 1.5rem;
+        }
+
+        .scenario-axis-tick {
+            position: absolute;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            transform: translateX(-50%);
+            white-space: nowrap;
         }
 
         .scenario-lanes {
@@ -2753,7 +2763,7 @@
             width: 2px;
             background: rgba(59, 130, 246, 0.7);
             pointer-events: none;
-            z-index: 3;
+            z-index: 10;
         }
 
         .scenario-today::before {
@@ -2856,6 +2866,14 @@
             text-transform: none;
             letter-spacing: normal;
             margin-right: 0;
+            min-width: 0;
+        }
+
+        .scenario-link > span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
         }
 
         .scenario-link:hover {
@@ -7565,17 +7583,29 @@
                 }
                 const issue = scenarioIssueByKey.get(issueKey);
                 if (!issue || !scenarioTimelineRef.current) return;
+
+                // First, scroll the main window to bring timeline into view
+                const container = scenarioTimelineRef.current;
+                const containerTop = container.getBoundingClientRect().top + window.scrollY;
+                window.scrollTo({ top: containerTop - 100, behavior: 'smooth' });
+
                 const lane = scenarioLaneForIssue(issue);
                 if (scenarioLaneMode === 'epic') {
                     setScenarioCollapsedLanes(prev => ({ ...prev, [lane]: false }));
                 }
                 const position = scenarioPositions[issueKey];
                 if (!position) return;
-                const container = scenarioTimelineRef.current;
+
+                // Then scroll within the timeline to the specific task
                 const axis = container.querySelector('.scenario-axis');
                 const axisOffset = axis ? axis.offsetHeight : 0;
                 const targetTop = Math.max(0, position.y + axisOffset - container.clientHeight / 2);
-                container.scrollTo({ top: targetTop, behavior: 'smooth' });
+
+                // Delay the timeline scroll slightly to allow page scroll to start
+                window.setTimeout(() => {
+                    container.scrollTo({ top: targetTop, behavior: 'smooth' });
+                }, 100);
+
                 setScenarioFlashKey(issueKey);
                 window.setTimeout(() => {
                     setScenarioFlashKey(current => (current === issueKey ? null : current));
@@ -10459,9 +10489,20 @@
                                             )}
                                             <div className="scenario-timeline" ref={scenarioTimelineRef}>
                                                 <div className="scenario-axis">
-                                                    {scenarioTicks.map((tick) => (
-                                                        <span key={tick.label}>{tick.label}</span>
-                                                    ))}
+                                                    <div className="scenario-axis-ticks">
+                                                        {scenarioTicks.map((tick) => {
+                                                            const left = `${tick.ratio * 100}%`;
+                                                            return (
+                                                                <span
+                                                                    key={tick.label}
+                                                                    className="scenario-axis-tick"
+                                                                    style={{ left }}
+                                                                >
+                                                                    {tick.label}
+                                                                </span>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
                                                 <div
                                                     className="scenario-lanes"
@@ -10677,7 +10718,13 @@
                                                         })}
                                                     </svg>
                                                 )}
-                                                {scenarioLayout.width > 0 && (
+                                                {scenarioLayout.width > 0 && scenarioDeadline && (() => {
+                                                    // Only show deadline if it's not a quarter boundary
+                                                    const deadlineMonth = scenarioDeadline.getMonth();
+                                                    const deadlineDate = scenarioDeadline.getDate();
+                                                    const isQuarterBoundary = (deadlineMonth % 3 === 0) && (deadlineDate === 1);
+                                                    return !isQuarterBoundary;
+                                                })() && (
                                                     <div
                                                         className="scenario-deadline"
                                                         style={{ left: `${scenarioDeadlineLeft}px` }}
