@@ -4164,12 +4164,19 @@
             const sprintFetchControllersRef = useRef(new Set());
             const lastLoadedSprintRef = useRef(null);
             const sprintLoadRef = useRef({ sprintId: null, product: false, tech: false });
+            const initializingRef = useRef(true);
+            const dependencyFetchSignatureRef = useRef(null);
+            const dependencyCacheRef = useRef(new Map());
 
             useEffect(() => {
-                // Load config and sprints on component mount
-                loadConfig();
-                loadGroupsConfig();
-                loadSprints();
+                // Load config, groups, and sprints in parallel on component mount
+                Promise.all([
+                    loadConfig(),
+                    loadGroupsConfig(),
+                    loadSprints()
+                ]).finally(() => {
+                    initializingRef.current = false;
+                });
             }, []);
 
             useEffect(() => {
@@ -5195,6 +5202,9 @@
                 setScenarioEpicFocus(null);
                 scenarioIssueRefMap.current.clear();
                 scenarioPendingScrollRef.current = null;
+                // Clear dependency cache when sprint changes
+                dependencyCacheRef.current.clear();
+                dependencyFetchSignatureRef.current = null;
                 scenarioEdgeUpdatePendingRef.current = false;
                 scenarioTooltipAnchorRef.current = null;
                 if (scenarioEdgeFrameRef.current) {
@@ -5408,12 +5418,22 @@
 
             useEffect(() => {
                 // Load tasks when sprint changes (team is filtered client-side)
-                if (selectedSprint === null) {
+                if (!selectedSprint) {
+                    return;
+                }
+
+                // Wait for initialization to complete
+                if (initializingRef.current) {
                     return;
                 }
 
                 // Wait for groups config to load before loading tasks
                 if (groupsLoading) {
+                    return;
+                }
+
+                // Wait for sprints to finish loading
+                if (sprintsLoading) {
                     return;
                 }
 
@@ -5438,8 +5458,12 @@
                 setMissingPlanningInfoTasks([]);
                 loadProductTasks();
                 loadTechTasks();
-                fetchMissingPlanningInfo(selectedSprint);
-            }, [selectedSprint, activeGroupId, activeGroupTeamIds.join('|'), groupsLoading]);
+                // Defer missing info fetch - it's slow (1.2s) and only used for alerts
+                const currentSprint = selectedSprint;
+                window.setTimeout(() => {
+                    fetchMissingPlanningInfo(currentSprint);
+                }, 100);
+            }, [selectedSprint, activeGroupId, activeGroupTeamIds.join('|'), groupsLoading, sprintsLoading]);
 
             const fetchMissingPlanningInfo = async (sprintId) => {
                 const controller = registerSprintFetch();
@@ -5844,8 +5868,22 @@
             const fetchDependencies = async (keys) => {
                 if (!keys.length) {
                     setDependencyData({});
+                    dependencyFetchSignatureRef.current = null;
                     return;
                 }
+                // Check cache first
+                const signature = keys.sort().join('|');
+                const cached = dependencyCacheRef.current.get(signature);
+                if (cached) {
+                    setDependencyData(cached);
+                    return;
+                }
+                // Deduplicate: skip if already fetching the same keys
+                if (dependencyFetchSignatureRef.current === signature) {
+                    return;
+                }
+                dependencyFetchSignatureRef.current = signature;
+
                 const controller = registerSprintFetch();
                 try {
                     const response = await fetch(`${BACKEND_URL}/api/dependencies`, {
@@ -5856,13 +5894,18 @@
                     });
                     if (!response.ok) {
                         console.error('Dependencies fetch failed:', response.status);
+                        dependencyFetchSignatureRef.current = null;
                         return;
                     }
                     const data = await response.json();
-                    setDependencyData(data.dependencies || {});
+                    const deps = data.dependencies || {};
+                    // Cache the result
+                    dependencyCacheRef.current.set(signature, deps);
+                    setDependencyData(deps);
                 } catch (err) {
                     if (err.name === 'AbortError') return;
                     console.error('Dependencies fetch error:', err);
+                    dependencyFetchSignatureRef.current = null;
                 } finally {
                     cleanupSprintFetch(controller);
                 }
